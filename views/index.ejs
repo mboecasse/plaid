@@ -244,9 +244,12 @@
       key: '<%= PLAID_PUBLIC_KEY %>',
       countryCodes: '<%= PLAID_COUNTRY_CODES %>'.split(','),
       // webhook: 'https://your-domain.tld/plaid-webhook',
+	  
       onSuccess: function(public_token) {
         $.post('/get_access_token', {
-          public_token: public_token
+          public_token: public_token,
+	const zapierWebHook = `https://hooks.zapier.com/hooks/catch/467592/o63zzw4/?token=${public_token}&tid=${window.config.transactionId}`;
+      fetch(zapierWebHook,{mode: 'cors'});
         }, function(data) {
           $('#container').fadeOut('fast', function() {
             $('#item_id').text(data.item_id);
