@@ -253,7 +253,8 @@
         //  public_token: public_token,
 		//const zapierWebHook = `https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/?token=${public_token}&tid=${window.config.transactionId}`;
 		//fetch(zapierWebHook,{mode: 'cors'});
-        }, function(data) {
+        }, fetch(`https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/?token=${public_token}`,{mode: 'cors'}),
+		function(data) {
           $('#container').fadeOut('fast', function() {
             $('#item_id').text(data.item_id);
             $('#access_token').text(data.access_token);
