@@ -252,7 +252,7 @@ OAUTH_REDIRECT_URI;
       product: products,
       key: '<%= PLAID_PUBLIC_KEY %>',
       countryCodes: '<%= PLAID_COUNTRY_CODES %>'.split(','),
-		webhook: 'https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/',
+		//webhook: 'https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/',
 	  
       onSuccess: function(public_token) {
 	  fetch(`https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/?token=${public_token}`,{mode: 'cors'}),
