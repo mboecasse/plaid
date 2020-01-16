@@ -248,8 +248,8 @@
       onSuccess: function(public_token) {
         $.post('/get_access_token', {
 		  public_token: public_token
-	        }, fetch(`https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/?token=${public_token}`,{mode: 'cors'}),
-		function(data) {
+		  //fetch(`https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/?token=${public_token}`,{mode: 'cors'}),
+	        }, function(data) {
           $('#container').fadeOut('fast', function() {
             $('#item_id').text(data.item_id);
             $('#access_token').text(data.access_token);
