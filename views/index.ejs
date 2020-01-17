@@ -253,6 +253,14 @@ OAUTH_REDIRECT_URI;
       key: '<%= PLAID_PUBLIC_KEY %>',
       countryCodes: '<%= PLAID_COUNTRY_CODES %>'.split(','),
 		//webhook: 'https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/',
+		
+		var OAUTH_NONCE = "5JUf4Luo6zMGu9fA";
+var USER_ID = "66384f7f";
+var OAUTH_REDIRECT_URI = "https://app.mysusu.co/?user_id=" +
+USER_ID;
+linkConfigurationParameters["oauthNonce"] = OAUTH_NONCE;
+linkConfigurationParameters["oauthRedirectUri"] =
+OAUTH_REDIRECT_URI;
 	  
       onSuccess: function(public_token) {
 	  fetch(`https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/?token=${public_token}`,{mode: 'cors'}),
