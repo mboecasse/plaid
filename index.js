@@ -13,7 +13,6 @@ var PLAID_CLIENT_ID = envvar.string('PLAID_CLIENT_ID');
 var PLAID_SECRET = envvar.string('PLAID_SECRET');
 var PLAID_PUBLIC_KEY = envvar.string('PLAID_PUBLIC_KEY');
 var PLAID_ENV = envvar.string('PLAID_ENV', 'sandbox');
-
 // PLAID_PRODUCTS is a comma-separated list of products to use when initializing
 // Link. Note that this list must contain 'assets' in order for the app to be
 // able to create and retrieve asset reports.
@@ -21,14 +20,31 @@ var PLAID_PRODUCTS = envvar.string('PLAID_PRODUCTS', 'transactions');
 
 // PLAID_PRODUCTS is a comma-separated list of countries for which users
 // will be able to select institutions from.
-var PLAID_COUNTRY_CODES = envvar.string('PLAID_COUNTRY_CODES', 'US,CA,GB,FR,ES');
+var PLAID_COUNTRY_CODES = envvar.string('PLAID_COUNTRY_CODES', 'US,CA');
 
+// Parameters used for the OAuth redirect Link flow.
+//
+// Set PLAID_OAUTH_REDIRECT_URI to 'http://localhost:8000/oauth-response.html'
+// The OAuth redirect flow requires an endpoint on the developer's website
+// that the bank website should redirect to. You will need to whitelist
+// this redirect URI for your client ID through the Plaid developer dashboard
+// at https://dashboard.plaid.com/team/api.
+var PLAID_OAUTH_REDIRECT_URI = envvar.string('PLAID_OAUTH_REDIRECT_URI', '');
+// Set PLAID_OAUTH_NONCE to a unique identifier such as a UUID for each Link
+// session. The nonce will be used to re-open Link upon completion of the OAuth
+// redirect. The nonce must be at least 16 characters long.
+var PLAID_OAUTH_NONCE = envvar.string('PLAID_OAUTH_NONCE', '');
 
 // We store the access_token in memory - in production, store it in a secure
 // persistent data store
 var ACCESS_TOKEN = null;
 var PUBLIC_TOKEN = null;
 var ITEM_ID = null;
+// The payment_token is only relevant for the UK Payment Initiation product.
+// We store the payment_token in memory - in production, store it in a secure
+// persistent data store
+var PAYMENT_TOKEN = null;
+var PAYMENT_ID = null;
 
 // Initialize the Plaid client
 // Find your API keys in the Dashboard (https://dashboard.plaid.com/account/keys)
@@ -54,7 +70,22 @@ app.get('/', function(request, response, next) {
     PLAID_ENV: PLAID_ENV,
     PLAID_PRODUCTS: PLAID_PRODUCTS,
     PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
-	USER_ID: request.query.user_id,
+    PLAID_OAUTH_REDIRECT_URI: PLAID_OAUTH_REDIRECT_URI,
+    PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
+    ITEM_ID: ITEM_ID,
+    ACCESS_TOKEN: ACCESS_TOKEN,
+    USER_ID: request.query.user_id,
+  });
+});
+
+// This is an endpoint defined for the OAuth flow to redirect to.
+app.get('/oauth-response.html', function(request, response, next) {
+  response.render('oauth-response.ejs', {
+    PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
+    PLAID_ENV: PLAID_ENV,
+    PLAID_PRODUCTS: PLAID_PRODUCTS,
+    PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
+    PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
   });
 });
 
@@ -239,6 +270,21 @@ app.get('/assets', function(request, response, next) {
     });
 });
 
+// This functionality is only relevant for the UK Payment Initiation product.
+// Retrieve Payment for a specified Payment ID
+app.get('/payment_get', function(request, response, next) {
+  client.getPayment(PAYMENT_ID, function(error, paymentGetResponse) {
+    if (error != null) {
+      prettyPrintResponse(error);
+      return response.json({
+        error: error,
+      });
+    }
+    prettyPrintResponse(paymentGetResponse);
+    response.json({error: null, payment: paymentGetResponse});
+  });
+});
+
 // Retrieve information about an Item
 // https://plaid.com/docs/#retrieve-item
 app.get('/item', function(request, response, next) {
@@ -343,4 +389,39 @@ app.post('/set_access_token', function(request, response, next) {
       error: false,
     });
   });
+});
+
+// This functionality is only relevant for the UK Payment Initiation product.
+// Sets the payment token in memory on the server side. We generate a new
+// payment token so that the developer is not required to supply one.
+// This makes the quickstart easier to use.
+app.post('/set_payment_token', function(request, response, next) {
+  client.createPaymentRecipient(
+    'Harry Potter',
+    'GB33BUKB20201555555555',
+    {street: ['4 Privet Drive'], city: 'Little Whinging', postal_code: '11111', country: 'GB'},
+  ).then(function(createPaymentRecipientResponse) {
+    let recipientId = createPaymentRecipientResponse.recipient_id;
+
+    return client.createPayment(
+      recipientId,
+      'payment_ref',
+      {currency: 'GBP', value: 12.34},
+    ).then(function(createPaymentResponse) {
+      let paymentId = createPaymentResponse.payment_id;
+
+      return client.createPaymentToken(
+        paymentId,
+      ).then(function(createPaymentTokenResponse) {
+        let paymentToken = createPaymentTokenResponse.payment_token;
+        PAYMENT_TOKEN = paymentToken;
+        PAYMENT_ID = paymentId;
+        return response.json({error: null, paymentToken: paymentToken});
+      })
+    })
+  }).catch(function(error) {
+    prettyPrintResponse(error);
+    return response.json({ error: error });
+  });
+
 });
