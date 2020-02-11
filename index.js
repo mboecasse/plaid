@@ -54,6 +54,7 @@ app.get('/', function(request, response, next) {
     PLAID_ENV: PLAID_ENV,
     PLAID_PRODUCTS: PLAID_PRODUCTS,
     PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
+	USER_ID: request.query.user_id,
   });
 });
 
