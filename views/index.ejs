@@ -283,7 +283,7 @@
       key: '<%= PLAID_PUBLIC_KEY %>',
       countryCodes: '<%= PLAID_COUNTRY_CODES %>'.split(','),
     };
-    var oauthRedirectUri = '<%= PLAID_OAUTH_REDIRECT_URI %>?user_id=<%= USER_ID %>';
+    var oauthRedirectUri = '<%= PLAID_OAUTH_REDIRECT_URI %>';
     if (oauthRedirectUri != '') {
       linkHandlerCommonOptions.oauthRedirectUri = oauthRedirectUri;
     }
