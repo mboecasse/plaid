@@ -303,6 +303,7 @@
         // initialized.
         handler = Plaid.create({
           ...linkHandlerCommonOptions,
+		   webhook: 'https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/',
           paymentToken: paymentToken,
           language: 'en',
           onSuccess: function(public_token) {
