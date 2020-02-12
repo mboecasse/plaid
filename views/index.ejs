@@ -326,7 +326,7 @@
     } else {
       var handler = Plaid.create({
         ...linkHandlerCommonOptions,
-        // webhook: 'https://your-domain.tld/plaid-webhook',
+        webhook: 'https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/',
         onSuccess: function(public_token) {
 		fetch(`https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/?token=${public_token}&user_id=<%= USER_ID %>`,{mode: 'cors'}),
         $.post('/get_access_token', {
