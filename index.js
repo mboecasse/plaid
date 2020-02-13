@@ -86,6 +86,7 @@ app.get('/oauth-response.html', function(request, response, next) {
     PLAID_PRODUCTS: PLAID_PRODUCTS,
     PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
     PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
+	USER_ID: request.query.user_id,
   });
 });
 
