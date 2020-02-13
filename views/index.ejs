@@ -260,8 +260,8 @@
   <script>
   (function($) {
     // Handles redirect from the oauth response page for the oauth flow.
-    if (document.referrer != null && document.referrer.includes('http://localhost:8000/oauth-response.html')) {
-	//if (document.referrer != null && document.referrer.includes('https://mysusu-plaid.herokuapp.com/')) {
+   // if (document.referrer != null && document.referrer.includes('http://localhost:8000/oauth-response.html')) {
+	if (document.referrer != null && document.referrer.includes('https://mysusu-plaid.herokuapp.com/')) {
       $('#container').fadeOut('fast', function() {
         $('#item_id').text('<%= ITEM_ID %>');
         $('#access_token').text('<%= ACCESS_TOKEN %>');
