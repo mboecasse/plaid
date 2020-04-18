@@ -7,8 +7,12 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var moment = require('moment');
 var plaid = require('plaid');
+var convertXml = require('xml-js');
+const superagent = require('superagent');
+var rp = require('request-promise');
 
-var APP_PORT = envvar.number('PORT', 8000);
+var APP_PORT = envvar.number('APP_PORT', 8000);
+var ZOHO_ACCESS_TOKEN = envvar.string('ZOHO_ACCESS_TOKEN');
 var PLAID_CLIENT_ID = envvar.string('PLAID_CLIENT_ID');
 var PLAID_SECRET = envvar.string('PLAID_SECRET');
 var PLAID_PUBLIC_KEY = envvar.string('PLAID_PUBLIC_KEY');
@@ -29,7 +33,7 @@ var PLAID_COUNTRY_CODES = envvar.string('PLAID_COUNTRY_CODES', 'US,CA');
 // that the bank website should redirect to. You will need to whitelist
 // this redirect URI for your client ID through the Plaid developer dashboard
 // at https://dashboard.plaid.com/team/api.
-var PLAID_OAUTH_REDIRECT_URI = envvar.string('PLAID_OAUTH_REDIRECT_URI', '');
+var PLAID_OAUTH_REDIRECT_URI = envvar.string('PLAID_OAUTH_REDIRECT_URI', 'http://localhost:8000/confirm-payment.html');
 // Set PLAID_OAUTH_NONCE to a unique identifier such as a UUID for each Link
 // session. The nonce will be used to re-open Link upon completion of the OAuth
 // redirect. The nonce must be at least 16 characters long.
@@ -45,6 +49,8 @@ var ITEM_ID = null;
 // persistent data store
 var PAYMENT_TOKEN = null;
 var PAYMENT_ID = null;
+
+
 
 // Initialize the Plaid client
 // Find your API keys in the Dashboard (https://dashboard.plaid.com/account/keys)
@@ -62,10 +68,11 @@ app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({
   extended: false
 }));
-app.use(bodyParser.json());
+app.use(bodyParser.json({ type: req => true }));
 
-app.get('/', function(request, response, next) {
-  response.render('index.ejs', {
+app.get('/', async function(request, response, next) {
+  response.render('init_payment.ejs', {
+  //response.render('index.ejs', {
     PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
     PLAID_ENV: PLAID_ENV,
     PLAID_PRODUCTS: PLAID_PRODUCTS,
@@ -75,8 +82,46 @@ app.get('/', function(request, response, next) {
     ITEM_ID: ITEM_ID,
     ACCESS_TOKEN: ACCESS_TOKEN,
     USER_ID: request.query.user_id,
+    TRANSAC_ID: request.query.transacid,
   });
 });
+
+app.get('/init-payment.html', async function(request, response, next) {
+  response.render('init_payment.ejs', {
+    PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
+    PLAID_ENV: PLAID_ENV,
+    PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
+    PLAID_OAUTH_REDIRECT_URI: PLAID_OAUTH_REDIRECT_URI,
+    PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
+    TRANSAC_ID: request.query.transacid,
+  });
+});
+
+// This is an endpoint defined for the OAuth flow to redirect to.
+app.get('/confirm-payment.html', function(request, response, next) {
+  try {
+    const {ref_id: referenceId} = request.query;
+    const transactionStatus = 'confirmed';
+
+    const url = `https://creator.zoho.com/api/mboecasse1/xml/pardna-v3/form/Payment_Initiation/record/update?status=${transactionStatus}&criteria=reference_id%3D%22${referenceId}%22&authtoken=${ZOHO_ACCESS_TOKEN}`
+    const res = await rp(url);
+    const jsonResponse = extractPaymentInfoFromzoho(res);
+
+    response.render('confirm-payment.ejs', {
+      PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
+      PLAID_ENV: PLAID_ENV,
+      PLAID_PRODUCTS: PLAID_PRODUCTS,
+      PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
+      PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
+    });
+  } catch (error) {
+    response.render('error.ejs', {
+      error
+    });
+  }
+});
+
+
 
 // This is an endpoint defined for the OAuth flow to redirect to.
 app.get('/oauth-response.html', function(request, response, next) {
@@ -86,7 +131,6 @@ app.get('/oauth-response.html', function(request, response, next) {
     PLAID_PRODUCTS: PLAID_PRODUCTS,
     PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
     PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
-	USER_ID: request.query.user_id,
   });
 });
 
@@ -425,4 +469,62 @@ app.post('/set_payment_token', function(request, response, next) {
     return response.json({ error: error });
   });
 
+});
+
+
+// This functionality is only relevant for the UK Payment Initiation product.
+// Sets the payment token in memory on the server side. We generate a new
+// payment token so that the developer is not required to supply one.
+// This makes the quickstart easier to use.
+app.post('/payment_recipient', async function(request, response, next) {
+  const {name, iban, address : { street, city, postal_code, country }} =  request.body;
+  try {
+    const recipient = await client.createPaymentRecipient(name, iban, {street, city, postal_code, country});
+    prettyPrintResponse(recipient);
+    return response.json({error: null, recipient});
+  } catch (error) {
+    prettyPrintResponse(error);
+    return response.json({ error: error });
+  }
+});
+
+const extractPaymentInfoFromzoho = (xml) => {
+  const { response: { records: {record: { column: zohoValues }}}} = convertXml.xml2js(xml, {compact: true});
+  const informations = {};
+  zohoValues.forEach((item) => {
+    informations[item._attributes.name] = item.value._cdata;
+  });
+  prettyPrintResponse(informations);
+  return informations;
+}
+
+// This functionality is only relevant for the UK Payment Initiation product.
+// Sets the payment token in memory on the server side. We generate a new
+// payment token so that the developer is not required to supply one.
+// This makes the quickstart easier to use.
+app.post('/init_payment', async function(request, response, next) {
+  try {
+    const {transacId} =  request.body;
+    prettyPrintResponse(transacId);
+    const getTransactionsInformationUrl = `https://creator.zoho.com/api/xml/pardna-v3/view/All_Payment_Initiations?authtoken=${ZOHO_ACCESS_TOKEN}&criteria=reference_id%3D%3D%22${transacId}%22`;
+    // fetch from zoho all information for transcation
+    const res = await rp(getTransactionsInformationUrl);
+    const {currency, amount: value, reference_id: referenceId, recipient_id: recipientId} = extractPaymentInfoFromzoho(res);
+
+    // const recipientId = 'recipient-id-sandbox-01fc76e7-23ba-4d02-9a2e-2dadad2bcb85';
+    const { payment_id: paymentId } = await client.createPayment(
+      recipientId,
+      referenceId,
+      {currency, value: parseFloat(value)},
+    );
+    prettyPrintResponse(paymentId);
+
+    const {  payment_token:paymentToken } = await client.createPaymentToken( paymentId );
+    PAYMENT_TOKEN = paymentToken;
+    PAYMENT_ID = paymentId;
+    return response.json({error: null, paymentToken});
+  } catch (error) {
+    prettyPrintResponse(error);
+    return response.json({ error: error });
+  }
 });

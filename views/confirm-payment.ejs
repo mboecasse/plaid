@@ -14,12 +14,11 @@
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <script>
   (function($) {
-    var products = '<%= PLAID_PRODUCTS %>'.split(',');
     var linkHandlerCommonOptions = {
       apiVersion: 'v2',
-      clientName: 'Plaid Quickstart',
+      clientName: 'MySusu',
       env: '<%= PLAID_ENV %>',
-      product: products,
+      product: 'payment_initiation',
       key: '<%= PLAID_PUBLIC_KEY %>',
       countryCodes: '<%= PLAID_COUNTRY_CODES %>'.split(','),
     };
