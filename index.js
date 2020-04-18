@@ -71,7 +71,7 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json({ type: req => true }));
 
 app.get('/', async function(request, response, next) {
-  response.render('init_payment.ejs', {
+  response.render('index.ejs', {
   //response.render('index.ejs', {
     PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
     PLAID_ENV: PLAID_ENV,
