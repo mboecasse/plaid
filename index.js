@@ -98,7 +98,7 @@ app.get('/init-payment.html', async function(request, response, next) {
 });
 
 // This is an endpoint defined for the OAuth flow to redirect to.
-app.get('/confirm-payment.html', function(request, response, next) {
+app.get('/confirm-payment.html', async function(request, response, next) {
   try {
     const {ref_id: referenceId} = request.query;
     const transactionStatus = 'confirmed';
