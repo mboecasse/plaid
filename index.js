@@ -11,7 +11,7 @@ var convertXml = require('xml-js');
 const superagent = require('superagent');
 var rp = require('request-promise');
 
-var APP_PORT = envvar.number('APP_PORT', 8000);
+var APP_PORT = envvar.number('PORT', 8000);
 var ZOHO_ACCESS_TOKEN = envvar.string('ZOHO_ACCESS_TOKEN');
 var PLAID_CLIENT_ID = envvar.string('PLAID_CLIENT_ID');
 var PLAID_SECRET = envvar.string('PLAID_SECRET');
