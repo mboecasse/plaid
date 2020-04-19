@@ -15,11 +15,12 @@
     "ejs": "2.5.x",
     "envvar": "1.1.x",
     "express": "4.16.x",
+    "express-session": "^1.17.1",
     "moment": "2.22.x",
     "plaid": "4.x.x",
     "request": "^2.88.2",
     "request-promise": "^4.2.5",
-    "superagent": "^5.2.2",
+    "session-file-store": "^1.4.0",
     "xml-js": "^1.6.11"
   }
 }

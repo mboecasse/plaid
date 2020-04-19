@@ -1,0 +1,39 @@
+{
+    "parserOptions": {
+      "ecmaVersion": 2018,
+      "sourceType": "script"
+    },
+    "extends": "standard",
+    "env": {
+      "node": true
+    },
+    "globals": {},
+    "rules": {
+      "comma-dangle": ["error", "always-multiline"],
+      "consistent-this": ["error"],
+      "dot-notation": ["error"],
+      "func-style": ["error", "expression", {"allowArrowFunctions": true}],
+      "indent": ["error", 4, { "SwitchCase": 1 }],
+      "no-extra-semi": ["error"],
+      "no-implicit-coercion": ["error"],
+      "no-multi-assign": ["error"],
+      "no-restricted-globals": ["error", "isNaN"],
+      "no-self-assign": ["error", {"props": true}],
+      "no-shadow": ["error"],
+      "no-useless-computed-key": ["error"],
+      "no-var": ["error"],
+      "standard/object-curly-even-spacing": ["error"],
+      "object-curly-spacing": ["off"],
+      "object-shorthand": ["error", "methods"],
+      "prefer-arrow-callback": ["error"],
+      "prefer-const": ["error"],
+      "prefer-numeric-literals": ["error"],
+      "prefer-rest-params": ["error"],
+      "prefer-spread": ["error"],
+      "prefer-template": ["error"],
+      "semi": ["error", "always"],
+      "space-before-function-paren": ["error", {"anonymous": "never", "named": "never", "asyncArrow": "always"}],
+      "strict": ["error", "global"]
+    }
+  }
+  
