@@ -109,8 +109,11 @@ app.get('/', async (request, response, next) => {
 });
 
 app.get('/init-payment.html', (request, response) => {
-    const handler = (error) => {
-        request.session.transacId = `session:${request.query.transacid}`;
+    const handler = async (error) => {
+        const { transacid } = request.query;
+        // udpate Zoho Status
+        await updatePaymentInZhoho({status: 'payment_pending'}, transacid);
+
         if (error) {
             response.render('error.ejs', { error });
         } else {
@@ -120,7 +123,7 @@ app.get('/init-payment.html', (request, response) => {
                 PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
                 PLAID_OAUTH_REDIRECT_URI: PLAID_OAUTH_REDIRECT_URI,
                 PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
-                TRANSAC_ID: request.query.transacid,
+                TRANSAC_ID: transacid,
             });
         }
     };
@@ -570,8 +573,6 @@ app.post('/init_payment', async (request, response, next) => {
     try {
         const {transacId} = request.body;
         prettyPrintResponse(transacId);
-        // udpate Zoho Status
-        await updatePaymentInZhoho({status: 'payment_pending'}, transacId);
 
         const getTransactionsInformationUrl = `https://creator.zoho.com/api/xml/pardna-v3/view/All_Payment_Initiations?authtoken=${ZOHO_ACCESS_TOKEN}&criteria=reference_id%3D%3D%22${transacId}%22`;
         // fetch from zoho all information for transcation
