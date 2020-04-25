@@ -8,7 +8,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
-const moment = require('moment');
 const plaid = require('plaid');
 const convertXml = require('xml-js');
 const rp = require('request-promise');
@@ -50,7 +49,7 @@ let ITEM_ID = null;
 // The payment_token is only relevant for the UK Payment Initiation product.
 // We store the payment_token in memory - in production, store it in a secure
 // persistent data store
-let PAYMENT_TOKEN = null;
+// let PAYMENT_TOKEN = null;
 let PAYMENT_ID = null;
 
 // Initialize the Plaid client
@@ -60,7 +59,7 @@ const client = new plaid.Client(
     PLAID_SECRET,
     PLAID_PUBLIC_KEY,
     plaid.environments[PLAID_ENV],
-    {version: '2019-05-29', clientApp: 'Plaid Quickstart'}
+    {version: '2019-05-29', clientApp: 'My Susu'}
 );
 
 const app = express();
@@ -93,7 +92,6 @@ app.use(session(sess));
 
 app.get('/', async (request, response, next) => {
     response.render('index.ejs', {
-        // response.render('index.ejs', {
         PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
         PLAID_ENV: PLAID_ENV,
         PLAID_PRODUCTS: PLAID_PRODUCTS,
@@ -102,9 +100,6 @@ app.get('/', async (request, response, next) => {
         PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
         ITEM_ID: ITEM_ID,
         ACCESS_TOKEN: ACCESS_TOKEN,
-        USER_ID: request.query.user_id,
-        TRANSAC_ID: request.query.transacid,
-        PAYMENT_TOKEN,
     });
 });
 
@@ -161,7 +156,7 @@ app.get('/confirm-payment.html', async (request, response) => {
 // This is an endpoint defined for the OAuth flow to redirect to.
 app.get('/oauth-response.html', async (request, response, next) => {
     try {
-        const { referenceId } = request.session;
+        const { referenceId, paymentToken } = request.session;
         console.log('req', request.session);
 
         // udpate Zoho Status
@@ -173,6 +168,8 @@ app.get('/oauth-response.html', async (request, response, next) => {
             PLAID_PRODUCTS: PLAID_PRODUCTS,
             PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
             PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
+            PLAID_OAUTH_REDIRECT_URI: PLAID_OAUTH_REDIRECT_URI,
+            paymentToken,
         });
     } catch (error) {
         console.error(error);
@@ -217,28 +214,6 @@ app.post('/get_access_token', (request, response, next) => {
     });
 });
 
-// Retrieve Transactions for an Item
-// https://plaid.com/docs/#transactions
-app.get('/transactions', (request, response, next) => {
-    // Pull transactions for the Item for the last 30 days
-    const startDate = moment().subtract(30, 'days').format('YYYY-MM-DD');
-    const endDate = moment().format('YYYY-MM-DD');
-    client.getTransactions(ACCESS_TOKEN, startDate, endDate, {
-        count: 250,
-        offset: 0,
-    }, (error, transactionsResponse) => {
-        if (error != null) {
-            prettyPrintResponse(error);
-            return response.json({
-                error: error,
-            });
-        } else {
-            prettyPrintResponse(transactionsResponse);
-            response.json({error: null, transactions: transactionsResponse});
-        }
-    });
-});
-
 // Retrieve Identity for an Item
 // https://plaid.com/docs/#identity
 app.get('/identity', (request, response, next) => {
@@ -251,36 +226,6 @@ app.get('/identity', (request, response, next) => {
         }
         prettyPrintResponse(identityResponse);
         response.json({error: null, identity: identityResponse});
-    });
-});
-
-// Retrieve real-time Balances for each of an Item's accounts
-// https://plaid.com/docs/#balance
-app.get('/balance', (request, response, next) => {
-    client.getBalance(ACCESS_TOKEN, (error, balanceResponse) => {
-        if (error != null) {
-            prettyPrintResponse(error);
-            return response.json({
-                error: error,
-            });
-        }
-        prettyPrintResponse(balanceResponse);
-        response.json({error: null, balance: balanceResponse});
-    });
-});
-
-// Retrieve an Item's accounts
-// https://plaid.com/docs/#accounts
-app.get('/accounts', (request, response, next) => {
-    client.getAccounts(ACCESS_TOKEN, (error, accountsResponse) => {
-        if (error != null) {
-            prettyPrintResponse(error);
-            return response.json({
-                error: error,
-            });
-        }
-        prettyPrintResponse(accountsResponse);
-        response.json({error: null, accounts: accountsResponse});
     });
 });
 
@@ -299,81 +244,6 @@ app.get('/auth', (request, response, next) => {
     });
 });
 
-// Retrieve Holdings for an Item
-// https://plaid.com/docs/#investments
-app.get('/holdings', (request, response, next) => {
-    client.getHoldings(ACCESS_TOKEN, (error, holdingsResponse) => {
-        if (error != null) {
-            prettyPrintResponse(error);
-            return response.json({
-                error: error,
-            });
-        }
-        prettyPrintResponse(holdingsResponse);
-        response.json({error: null, holdings: holdingsResponse});
-    });
-});
-
-// Retrieve Investment Transactions for an Item
-// https://plaid.com/docs/#investments
-app.get('/investment_transactions', (request, response, next) => {
-    const startDate = moment().subtract(30, 'days').format('YYYY-MM-DD');
-    const endDate = moment().format('YYYY-MM-DD');
-    client.getInvestmentTransactions(ACCESS_TOKEN, startDate, endDate, (error, investmentTransactionsResponse) => {
-        if (error != null) {
-            prettyPrintResponse(error);
-            return response.json({
-                error: error,
-            });
-        }
-        prettyPrintResponse(investmentTransactionsResponse);
-        response.json({error: null, investment_transactions: investmentTransactionsResponse});
-    });
-});
-
-// Create and then retrieve an Asset Report for one or more Items. Note that an
-// Asset Report can contain up to 100 items, but for simplicity we're only
-// including one Item here.
-// https://plaid.com/docs/#assets
-app.get('/assets', (request, response, next) => {
-    // You can specify up to two years of transaction history for an Asset
-    // Report.
-    const daysRequested = 10;
-
-    // The `options` object allows you to specify a webhook for Asset Report
-    // generation, as well as information that you want included in the Asset
-    // Report. All fields are optional.
-    const options = {
-        client_report_id: 'Custom Report ID #123',
-        // webhook: 'https://your-domain.tld/plaid-webhook',
-        user: {
-            client_user_id: 'Custom User ID #456',
-            first_name: 'Alice',
-            middle_name: 'Bobcat',
-            last_name: 'Cranberry',
-            ssn: '123-45-6789',
-            phone_number: '555-123-4567',
-            email: 'alice@example.com',
-        },
-    };
-    client.createAssetReport(
-        [ACCESS_TOKEN],
-        daysRequested,
-        options,
-        (error, assetReportCreateResponse) => {
-            if (error != null) {
-                prettyPrintResponse(error);
-                return response.json({
-                    error: error,
-                });
-            }
-            prettyPrintResponse(assetReportCreateResponse);
-
-            const assetReportToken = assetReportCreateResponse.asset_report_token;
-            respondWithAssetReport(20, assetReportToken, client, response);
-        });
-});
-
 // This functionality is only relevant for the UK Payment Initiation product.
 // Retrieve Payment for a specified Payment ID
 app.get('/payment_get', (request, response, next) => {
@@ -389,100 +259,12 @@ app.get('/payment_get', (request, response, next) => {
     });
 });
 
-// Retrieve information about an Item
-// https://plaid.com/docs/#retrieve-item
-app.get('/item', (request, response, next) => {
-    // Pull the Item - this includes information about available products,
-    // billed products, webhook information, and more.
-    client.getItem(ACCESS_TOKEN, (error, itemResponse) => {
-        if (error != null) {
-            prettyPrintResponse(error);
-            return response.json({
-                error: error,
-            });
-        }
-        // Also pull information about the institution
-        client.getInstitutionById(itemResponse.item.institution_id, (err, instRes) => {
-            if (err != null) {
-                const msg = 'Unable to pull institution information from the Plaid API.';
-                console.log(`${msg}\n${JSON.stringify(error)}`);
-                return response.json({
-                    error: msg,
-                });
-            } else {
-                prettyPrintResponse(itemResponse);
-                response.json({
-                    item: itemResponse.item,
-                    institution: instRes.institution,
-                });
-            }
-        });
-    });
-});
-
 app.listen(APP_PORT, () => {
     console.log(`plaid-quickstart server listening on port ${APP_PORT}`);
 });
 
 const prettyPrintResponse = response => {
     console.log(util.inspect(response, {colors: true, depth: 4}));
-};
-
-// This is a helper function to poll for the completion of an Asset Report and
-// then send it in the response to the client. Alternatively, you can provide a
-// webhook in the `options` object in your `/asset_report/create` request to be
-// notified when the Asset Report is finished being generated.
-const respondWithAssetReport = (
-    numRetriesRemaining,
-    assetReportToken,
-    localClient,
-    response
-) => {
-    if (numRetriesRemaining === 0) {
-        return response.json({
-            error: 'Timed out when polling for Asset Report',
-        });
-    }
-
-    const includeInsights = false;
-    localClient.getAssetReport(
-        assetReportToken,
-        includeInsights,
-        (assetReportGetError, assetReportGetResponse) => {
-            if (assetReportGetError != null) {
-                prettyPrintResponse(assetReportGetError);
-                if (assetReportGetError.error_code === 'PRODUCT_NOT_READY') {
-                    setTimeout(
-                        () => respondWithAssetReport(
-                            --numRetriesRemaining, assetReportToken, client, response),
-                        1000
-                    );
-                    return;
-                }
-
-                return response.json({
-                    error: assetReportGetError,
-                });
-            }
-
-            localClient.getAssetReportPdf(
-                assetReportToken,
-                (assetReportGetPdfError, assetReportGetPdfResponse) => {
-                    if (assetReportGetPdfError != null) {
-                        return response.json({
-                            error: assetReportGetPdfError,
-                        });
-                    }
-
-                    response.json({
-                        error: null,
-                        json: assetReportGetResponse.report,
-                        pdf: assetReportGetPdfResponse.buffer.toString('base64'),
-                    });
-                }
-            );
-        }
-    );
 };
 
 app.post('/set_access_token', (request, response, next) => {
@@ -518,7 +300,7 @@ app.post('/set_payment_token', (request, response, next) => {
                 paymentId,
             ).then((createPaymentTokenResponse) => {
                 const paymentToken = createPaymentTokenResponse.payment_token;
-                PAYMENT_TOKEN = paymentToken;
+                // PAYMENT_TOKEN = paymentToken;
                 PAYMENT_ID = paymentId;
                 return response.json({error: null, paymentToken: paymentToken});
             });
@@ -585,9 +367,6 @@ app.post('/init_payment', async (request, response, next) => {
             throw new Error('Already Confirmed');
         }
 
-        // save zoho_reference_id in session to finalize payment later
-        request.session.referenceId = referenceId;
-
         // const recipientId = 'recipient-id-sandbox-01fc76e7-23ba-4d02-9a2e-2dadad2bcb85';
         const { payment_id: paymentId } = await client.createPayment(
             recipientId,
@@ -597,7 +376,48 @@ app.post('/init_payment', async (request, response, next) => {
         prettyPrintResponse(paymentId);
         const { payment_token: paymentToken } = await client.createPaymentToken(paymentId);
 
+        // save zoho_reference_id in session to finalize payment later
+        request.session.referenceId = referenceId;
+        request.session.paymentToken = paymentToken;
+        request.session.paymentId = paymentId;
+
         return response.json({error: null, paymentToken});
+    } catch (errorhandler) {
+        prettyPrintResponse(errorhandler);
+        return response.json({ error: errorhandler });
+    }
+});
+
+app.post('/update_payment', async (request, response, next) => {
+    try {
+        const { referenceId } = request.session;
+        const { eventName, errorCode } = request.body;
+        prettyPrintResponse(request.body);
+
+        if (eventName === 'ERROR' || errorCode) {
+            // udpate Zoho Status
+            await updatePaymentInZhoho({status: 'error'}, referenceId);
+        }
+
+        return response.json({ error: null });
+    } catch (errorhandler) {
+        prettyPrintResponse(errorhandler);
+        return response.json({ error: errorhandler });
+    }
+});
+
+app.post('/finish_payment', async (request, response, next) => {
+    try {
+        const { referenceId } = request.session;
+        const { public_token: publicToken, metadata } = request.body;
+        prettyPrintResponse(publicToken, metadata);
+
+        const { access_token: accessToken } = await client.exchangePublicToken(publicToken);
+        request.session.accessToken = accessToken;
+
+        // udpate Zoho Status
+        await updatePaymentInZhoho({status: 'confirmed'}, referenceId);
+        return response.json({ error: null, accessToken });
     } catch (errorhandler) {
         prettyPrintResponse(errorhandler);
         return response.json({ error: errorhandler });

@@ -47,6 +47,7 @@
       product: 'payment_initiation',
       key: '<%= PLAID_PUBLIC_KEY %>',
       countryCodes: '<%= PLAID_COUNTRY_CODES %>'.split(','),
+      language: navigator.language,
     };
     var oauthRedirectUri = '<%= PLAID_OAUTH_REDIRECT_URI %>';
     if (oauthRedirectUri != '') {
@@ -68,7 +69,6 @@
       handler = Plaid.create({
         ...linkHandlerCommonOptions,
         paymentToken: paymentToken,
-        language: 'en',
         onSuccess: function(public_token) {
           // This public token exchange step is not relevant for the
           // payment_initiation product and should be skipped.
