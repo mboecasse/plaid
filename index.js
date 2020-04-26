@@ -316,9 +316,10 @@ app.post('/set_payment_token', (request, response, next) => {
 // payment token so that the developer is not required to supply one.
 // This makes the quickstart easier to use.
 app.post('/payment_recipient', async (request, response, next) => {
-    const {name, iban, address: { street, city, postal_code: postalCode, country }} = request.body;
+    // eslint-disable-next-line camelcase
+    const {name, iban, address: { street, city, postal_code, country }} = request.body;
     try {
-        const recipient = await client.createPaymentRecipient(name, iban, {street, city, postalCode, country});
+        const recipient = await client.createPaymentRecipient(name, iban, {street, city, postal_code, country});
         prettyPrintResponse(recipient);
         return response.json({error: null, recipient});
     } catch (error) {
