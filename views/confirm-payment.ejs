@@ -73,7 +73,7 @@
       key: '<%= PLAID_PUBLIC_KEY %>',
       countryCodes: '<%= PLAID_COUNTRY_CODES %>'.split(','),
       paymentToken: '<%= paymentToken %>',
-      language: navigator.language,
+      language: 'en',
     };
     var oauthNonce = '<%= PLAID_OAUTH_NONCE %>';
     if (oauthNonce == null || oauthNonce == '') {

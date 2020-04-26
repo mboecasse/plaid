@@ -47,7 +47,7 @@
       product: 'payment_initiation',
       key: '<%= PLAID_PUBLIC_KEY %>',
       countryCodes: '<%= PLAID_COUNTRY_CODES %>'.split(','),
-      language: navigator.language,
+      language: 'en',
     };
     var oauthRedirectUri = '<%= PLAID_OAUTH_REDIRECT_URI %>';
     if (oauthRedirectUri != '') {
@@ -72,7 +72,7 @@
         onSuccess: function(public_token) {
           // This public token exchange step is not relevant for the
           // payment_initiation product and should be skipped.
-          $.post('/get_access_token', {
+          /*$.post('/get_access_token', {
             public_token: public_token
           }, function(data) {
             $('#container').fadeOut('fast', function() {
@@ -81,7 +81,7 @@
               $('#intro').hide();
               $('#app, #steps').fadeIn('slow');
             });
-          });
+          });*/
         },
       });
       $('#link-btn').attr('disabled', false);
