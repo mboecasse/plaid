@@ -325,7 +325,7 @@ app.post('/payment_recipient', async (request, response, next) => {
 // This makes the quickstart easier to use.
 app.get('/recipients', (request, response, next) => {
     if (PLAID_ENV !== 'sandbox') {
-        return response.res.status(404).json('I dont have that');
+        return response.status(404).json('I dont have that');
     }
 
     client.listPaymentRecipients((error, recipients) => {
