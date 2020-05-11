@@ -41,17 +41,6 @@ const PLAID_OAUTH_REDIRECT_URI = envvar.string('PLAID_OAUTH_REDIRECT_URI', 'http
 // redirect. The nonce must be at least 16 characters long.
 const PLAID_OAUTH_NONCE = envvar.string('PLAID_OAUTH_NONCE', '');
 
-// We store the access_token in memory - in production, store it in a secure
-// persistent data store
-let ACCESS_TOKEN = null;
-let PUBLIC_TOKEN = null;
-let ITEM_ID = null;
-// The payment_token is only relevant for the UK Payment Initiation product.
-// We store the payment_token in memory - in production, store it in a secure
-// persistent data store
-// let PAYMENT_TOKEN = null;
-let PAYMENT_ID = null;
-
 // Initialize the Plaid client
 // Find your API keys in the Dashboard (https://dashboard.plaid.com/account/keys)
 const client = new plaid.Client(
@@ -91,6 +80,7 @@ if (app.get('env') === 'production') {
 app.use(session(sess));
 
 app.get('/', async (request, response, next) => {
+    const { itemId, accessToken } = request.session;
     response.render('index.ejs', {
         PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
         PLAID_ENV: PLAID_ENV,
@@ -98,8 +88,17 @@ app.get('/', async (request, response, next) => {
         PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
         PLAID_OAUTH_REDIRECT_URI: '',
         PLAID_OAUTH_NONCE: '',
-        ITEM_ID: ITEM_ID,
-        ACCESS_TOKEN: ACCESS_TOKEN,
+        ITEM_ID: itemId,
+        ACCESS_TOKEN: accessToken,
+    });
+});
+
+app.get('/create-recipient.html', async (request, response, next) => {
+    response.render('create-recipient.ejs', {
+        PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
+        PLAID_ENV: PLAID_ENV,
+        PLAID_PRODUCTS: PLAID_PRODUCTS,
+        PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
     });
 });
 
@@ -186,20 +185,25 @@ app.get('/oauth-response.html', async (request, response, next) => {
 // an API access_token
 // https://plaid.com/docs/#exchange-token-flow
 app.post('/get_access_token', (request, response, next) => {
-    PUBLIC_TOKEN = request.body.public_token;
-    client.exchangePublicToken(PUBLIC_TOKEN, (error, tokenResponse) => {
+    const publicToken = request.body.public_token;
+    client.exchangePublicToken(publicToken, (error, tokenResponse) => {
         if (error != null) {
             prettyPrintResponse(error);
             return response.json({
                 error: error,
             });
         }
-        ACCESS_TOKEN = tokenResponse.access_token;
-        ITEM_ID = tokenResponse.item_id;
+        const accessToken = tokenResponse.access_token;
+        const itemId = tokenResponse.item_id;
+
+        request.session.accessToken = accessToken;
+        request.session.itemId = itemId;
+        request.session.publicToken = publicToken;
+
         prettyPrintResponse(tokenResponse);
         response.json({
-            access_token: ACCESS_TOKEN,
-            item_id: ITEM_ID,
+            access_token: accessToken,
+            item_id: itemId,
             error: null,
         });
     });
@@ -208,7 +212,8 @@ app.post('/get_access_token', (request, response, next) => {
 // Retrieve Identity for an Item
 // https://plaid.com/docs/#identity
 app.get('/identity', (request, response, next) => {
-    client.getIdentity(ACCESS_TOKEN, (error, identityResponse) => {
+    const { accessToken } = request.session;
+    client.getIdentity(accessToken, (error, identityResponse) => {
         if (error != null) {
             prettyPrintResponse(error);
             return response.json({
@@ -223,7 +228,8 @@ app.get('/identity', (request, response, next) => {
 // Retrieve ACH or ETF Auth data for an Item's accounts
 // https://plaid.com/docs/#auth
 app.get('/auth', (request, response, next) => {
-    client.getAuth(ACCESS_TOKEN, (error, authResponse) => {
+    const { accessToken } = request.session;
+    client.getAuth(accessToken, (error, authResponse) => {
         if (error != null) {
             prettyPrintResponse(error);
             return response.json({
@@ -238,7 +244,7 @@ app.get('/auth', (request, response, next) => {
 // This functionality is only relevant for the UK Payment Initiation product.
 // Retrieve Payment for a specified Payment ID
 app.get('/payment_get', (request, response, next) => {
-    client.getPayment(PAYMENT_ID, (error, paymentGetResponse) => {
+    client.getPayment(request.session.paymentToken, (error, paymentGetResponse) => {
         if (error != null) {
             prettyPrintResponse(error);
             return response.json({
@@ -259,8 +265,8 @@ const prettyPrintResponse = response => {
 };
 
 app.post('/set_access_token', (request, response, next) => {
-    ACCESS_TOKEN = request.body.access_token;
-    client.getItem(ACCESS_TOKEN, (error, itemResponse) => {
+    request.session.accessToken = request.body.access_token;
+    client.getItem(request.body.access_token, (error, itemResponse) => {
         response.json({
             item_id: itemResponse.item.item_id,
             error: error,
@@ -291,8 +297,10 @@ app.post('/set_payment_token', (request, response, next) => {
                 paymentId,
             ).then((createPaymentTokenResponse) => {
                 const paymentToken = createPaymentTokenResponse.payment_token;
-                // PAYMENT_TOKEN = paymentToken;
-                PAYMENT_ID = paymentId;
+
+                request.session.paymentToken = paymentToken;
+                request.session.paymentId = paymentId;
+
                 return response.json({error: null, paymentToken: paymentToken});
             });
         });
@@ -306,11 +314,39 @@ app.post('/set_payment_token', (request, response, next) => {
 // Sets the payment token in memory on the server side. We generate a new
 // payment token so that the developer is not required to supply one.
 // This makes the quickstart easier to use.
-app.post('/payment_recipient', async (request, response, next) => {
-    // eslint-disable-next-line camelcase
-    const {name, iban, address: { street, city, postal_code, country }} = request.body;
+// { "name": "Ludovic 2",
+//   "iban": "GB33BUKB20201555555555",
+//    "address": {"street": ["4 Privet Drive"], "city": "Little Whinging", "postal_code": "11111", "country": "FR"}
+app.post('/recipients', async (request, response, next) => {
     try {
-        const recipient = await client.createPaymentRecipient(name, iban, {street, city, postal_code, country});
+        const { accessToken } = request.session;
+        const { account_id: accountId } = request.body;
+        let name, iban, street, city, postalCode, country;
+
+        if (accountId) {
+            const authResponse = await client.getAuth(accessToken);
+            const identityResponse = await client.getIdentity(accessToken);
+
+            const owner = identityResponse.accounts.find((item) => { return item.account_id === accountId; }).owners[0];
+            name = owner.names[0];
+            iban = authResponse.numbers.international.find((item) => { return item.account_id === accountId; }).iban;
+
+            const address = owner.addresses.find((adress) => { return adress.primary === true; }).data;
+            street = [address.street];
+            city = address.city;
+            postalCode = address.postal_code;
+            country = address.country;
+        } else {
+            name = request.body;
+            iban = request.body.iban;
+
+            street = request.body.address.street;
+            city = request.body.address.city;
+            postalCode = request.body.address.postal_code;
+            country = request.body.address.country;
+        }
+
+        const recipient = await client.createPaymentRecipient(name, iban, {street, city, postal_code: postalCode, country});
         prettyPrintResponse(recipient);
         return response.json({error: null, recipient});
     } catch (error) {
