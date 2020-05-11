@@ -96,8 +96,8 @@ app.get('/', async (request, response, next) => {
         PLAID_ENV: PLAID_ENV,
         PLAID_PRODUCTS: PLAID_PRODUCTS,
         PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
-        PLAID_OAUTH_REDIRECT_URI: PLAID_OAUTH_REDIRECT_URI,
-        PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
+        PLAID_OAUTH_REDIRECT_URI: '',
+        PLAID_OAUTH_NONCE: '',
         ITEM_ID: ITEM_ID,
         ACCESS_TOKEN: ACCESS_TOKEN,
     });
@@ -326,6 +326,21 @@ app.post('/payment_recipient', async (request, response, next) => {
         prettyPrintResponse(error);
         return response.json({ error: error });
     }
+});
+
+// This functionality is only relevant for the UK Payment Initiation product.
+// Sets the payment token in memory on the server side. We generate a new
+// payment token so that the developer is not required to supply one.
+// This makes the quickstart easier to use.
+app.get('/recipients', (request, response, next) => {
+    client.listPaymentRecipients((error, recipients) => {
+        if (error) {
+            prettyPrintResponse(error);
+            return response.json({ error: error });
+        }
+        prettyPrintResponse(recipients);
+        return response.json({error: null, recipients});
+    });
 });
 
 const parseZohoResponse = (xml) => {
