@@ -180,15 +180,6 @@ app.get('/oauth-response.html', async (request, response, next) => {
         console.log('clean session');
         delete request.session;
     }
-    /*
-  response.render('oauth-response.ejs', {
-    PLAID_PUBLIC_KEY: PLAID_PUBLIC_KEY,
-    PLAID_ENV: PLAID_ENV,
-    PLAID_PRODUCTS: PLAID_PRODUCTS,
-    PLAID_COUNTRY_CODES: PLAID_COUNTRY_CODES,
-    PLAID_OAUTH_NONCE: PLAID_OAUTH_NONCE,
-  });
-  */
 });
 
 // Exchange token flow - exchange a Link public_token for
@@ -333,6 +324,10 @@ app.post('/payment_recipient', async (request, response, next) => {
 // payment token so that the developer is not required to supply one.
 // This makes the quickstart easier to use.
 app.get('/recipients', (request, response, next) => {
+    if (PLAID_ENV !== 'sandbox') {
+        return response.res.status(404).json('I dont have that');
+    }
+
     client.listPaymentRecipients((error, recipients) => {
         if (error) {
             prettyPrintResponse(error);
